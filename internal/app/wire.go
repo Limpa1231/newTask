@@ -20,6 +20,7 @@ import (
 	"github.com/krisch/crm-backend/internal/health"
 	"github.com/krisch/crm-backend/internal/helpers"
 	"github.com/krisch/crm-backend/internal/jwt"
+	"github.com/krisch/crm-backend/internal/legalentities"
 	"github.com/krisch/crm-backend/internal/logs"
 	"github.com/krisch/crm-backend/internal/notifications"
 	"github.com/krisch/crm-backend/internal/permissions"
@@ -89,6 +90,9 @@ func InitApp(name string, creds postgres.Creds, metrics bool, rc redis.Creds) (*
 		permissions.NewRepository,
 		permissions.New,
 
+		legalentities.NewRepository,
+		legalentities.NewService,
+
 		s3Conf,
 		s3.NewRepository,
 		s3.New,
@@ -147,6 +151,7 @@ func NewApp(name string, conf *configs.Configs, gdb *postgres.GDB, rds *redis.RD
 	profileService *profile.Service,
 	emailService emails.IEmailsService,
 	federationService *federation.Service,
+	legalEntitiesService *legalentities.Service,
 	taskService *task.Service,
 	commentService *comments.Service,
 	dictionaryService *dictionary.Service,
@@ -197,6 +202,7 @@ func NewApp(name string, conf *configs.Configs, gdb *postgres.GDB, rds *redis.RD
 	w.ProfileService = profileService
 	w.CacheService = cacheService
 	w.FederationService = federationService
+	w.LegalEntitiesService = legalEntitiesService
 	w.TaskService = taskService
 	w.CommentService = commentService
 	w.RemindersService = remindersService
