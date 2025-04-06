@@ -21,16 +21,3 @@ type LegalEntityUpdate struct {
 	UpdatedBy string  `json:"updated_by"`
 }
 
-type LegalEntitiesRepository interface {
-	Create(ctx context.Context, entity *LegalEntity) error
-	GetByFederation(ctx context.Context, federationID uuid.UUID) ([]*LegalEntity, error)
-	Update(ctx context.Context, id uuid.UUID, name string, updatedBy string) error
-	Delete(ctx context.Context, id uuid.UUID, deletedBy string) error
-}
-
-type LegalEntitiesService interface {
-	Create(ctx context.Context, entity *LegalEntity) error
-	GetByFederation(ctx context.Context, federationID uuid.UUID) ([]*LegalEntity, error)
-	Update(ctx context.Context, id uuid.UUID, name string, updatedBy string) error
-	Delete(ctx context.Context, id uuid.UUID, deletedBy string) error
-}
