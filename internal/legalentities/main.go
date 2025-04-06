@@ -5,11 +5,17 @@ import (
 	"github.com/krisch/crm-backend/domain"
 )
 
+type LegalEntitiesRepository interface {
+	CreateLegalEntity(legalEntity *domain.LegalEntity) error
+	GetAllLegalEntities() ([]domain.LegalEntity, error)
+	UpdateLegalEntity(legalEntity domain.LegalEntity) error
+	DeleteLegalEntity(legalEntityUUID uuid.UUID) error
+}
 type Service struct {
-	repo *Repository
+	repo LegalEntitiesRepository
 }
 
-func NewService(repo *Repository) *Service {
+func NewService(repo LegalEntitiesRepository) *Service {
 	return &Service{
 		repo: repo,
 	}

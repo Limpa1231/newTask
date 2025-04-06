@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,4 +19,3 @@ type LegalEntityUpdate struct {
 	Name      *string `json:"name,omitempty"`
 	UpdatedBy string  `json:"updated_by"`
 }
-

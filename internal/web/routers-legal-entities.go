@@ -4,12 +4,20 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/krisch/crm-backend/domain"
 	"github.com/krisch/crm-backend/internal/jwt"
 	oapi "github.com/krisch/crm-backend/internal/web/ofederation"
 	echo "github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
 )
+
+type LegalEntitiesService interface {
+	CreateLegalEntity(legalEntity *domain.LegalEntity) error
+	GetAllLegalEntities() ([]domain.LegalEntity, error)
+	UpdateLegalEntity(legalEntity domain.LegalEntity) error
+	DeleteLegalEntity(legalEntityUUID uuid.UUID) error
+}
 
 func initOpenAPILegalEntityRouters(a *Web, e *echo.Echo) {
 	logrus.WithField("route", "oFederation").Debug("routes initialization")
