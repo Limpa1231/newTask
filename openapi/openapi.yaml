@@ -679,6 +679,85 @@ paths:
         500:
           description: Internal server error
 
+    # Банковские счета
+  /bank-accounts:
+    get:
+      summary: Get all bank accounts
+      tags:
+        - federation
+      responses:
+        200:
+          description: A list of bank accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BankAccountDTO"
+        400:
+          description: Bad request
+        500:
+          description: Internal server error
+    post:
+      summary: Create a new bank account
+      tags:
+        - federation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BankAccountDTO"
+      responses:
+        201:
+          description: Bank account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankAccountDTO"
+        400:
+          description: Bad request
+        500:
+          description: Internal server error
+
+  /bank-accounts/{UUID}:
+    patch:
+      parameters:
+        - $ref: "#/components/parameters/uuid"
+      summary: Update bank account
+      tags:
+        - federation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BankAccountDTO"
+      responses:
+        200:
+          description: Bank account updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BankAccountDTO"
+        400:
+          description: Bad request
+        404:
+          description: Bank account not found
+        500:
+          description: Internal server error
+    delete:
+      parameters:
+        - $ref: "#/components/parameters/uuid"
+      summary: Delete bank account
+      tags:
+        - federation
+      responses:
+        204:
+          description: Bank account deleted successfully
+        404:
+          description: Bank account not found
+        500:
+          description: Internal server error
 
   /federation:
     post:
@@ -4193,7 +4272,66 @@ components:
           type: string
           format: date-time
 
-
+    BankAccountDTO:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          description: Unique identifier of bank account
+        name:
+          type: string
+          description: Bank account name/description
+          maxLength: 255
+          example: "Основной расчетный счет"
+        legal_entity_uuid:
+          type: string
+          format: uuid
+          nullable: true
+          description: Reference to legal entity
+        bic:
+          type: string
+          description: Bank Identification Code (9 digits)
+          pattern: '^[0-9]{9}$'
+        bank:
+          type: string
+          description: Bank name
+          maxLength: 255
+        address:
+          type: string
+          description: Bank address
+          maxLength: 255
+        corr_account:
+          type: string
+          description: Correspondent account
+          pattern: '^[0-9]{20}$'
+        current_account:
+          type: string
+          description: Payment account number
+          pattern: '^[0-9]{20}$'
+        currency:
+          type: string
+          description: Currency code (3 letters)
+          pattern: '^[A-Z]{3}$'
+        comment:
+          type: string
+          description: Additional comments
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+          description: Last update timestamp
+      required:
+        - uuid
+        - bic
+        - current_account
+        - currency
+        - name
 
     TaskPutRequest:
       type: object

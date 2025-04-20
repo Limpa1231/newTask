@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -81,7 +82,6 @@ func (a *Web) GetLegalEntities(ctx context.Context, _ oapi.GetLegalEntitiesReque
 	return oapi.GetLegalEntities200JSONResponse(legalEntities), nil
 }
 
-// PatchLegalentitiesUUID implements ofederation.StrictServerInterface.
 func (a *Web) PatchLegalEntitiesUUID(ctx context.Context, request oapi.PatchLegalEntitiesUUIDRequestObject) (oapi.PatchLegalEntitiesUUIDResponseObject, error) {
 	if _, ok := ctx.Value(claimsKey).(jwt.Claims); !ok {
 		return nil, ErrInvalidAuthHeader
@@ -95,16 +95,14 @@ func (a *Web) PatchLegalEntitiesUUID(ctx context.Context, request oapi.PatchLega
 		return nil, err
 	}
 
-	// Возвращаем данные на основе запроса, так как сервис не возвращает обновленную сущность
 	return oapi.PatchLegalEntitiesUUID200JSONResponse{
 		UUID:      request.UUID,
 		Name:      request.Body.Name,
-		CreatedAt: time.Now(), // Эти значения должны быть получены из БД
-		UpdatedAt: time.Now(), // В реальном коде нужно получить актуальные значения
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}, nil
 }
 
-// DeleteLegalentitiesUUID implements ofederation.StrictServerInterface.
 func (a *Web) DeleteLegalEntitiesUUID(ctx context.Context, request oapi.DeleteLegalEntitiesUUIDRequestObject) (oapi.DeleteLegalEntitiesUUIDResponseObject, error) {
 	_, ok := ctx.Value(claimsKey).(jwt.Claims)
 	if !ok {
@@ -117,4 +115,212 @@ func (a *Web) DeleteLegalEntitiesUUID(ctx context.Context, request oapi.DeleteLe
 	}
 
 	return oapi.DeleteLegalEntitiesUUID204Response{}, nil
+}
+
+func (a *Web) GetBankAccounts(ctx context.Context, _ oapi.GetBankAccountsRequestObject) (oapi.GetBankAccountsResponseObject, error) {
+	_, ok := ctx.Value(claimsKey).(jwt.Claims)
+	if !ok {
+		return nil, ErrInvalidAuthHeader
+	}
+
+	accounts, err := a.app.LegalEntitiesService.GetAllBankAccounts()
+	if err != nil {
+		return nil, err
+	}
+
+	accountsDTO := make([]oapi.BankAccountDTO, len(accounts))
+	for i := range accounts {
+		account := accounts[i]
+		var legalEntityUUID *uuid.UUID
+		if account.LegalEntityUUID != uuid.Nil {
+			legalEntityUUID = &account.LegalEntityUUID
+		}
+
+		accountsDTO[i] = oapi.BankAccountDTO{
+			Uuid:            account.UUID,
+			LegalEntityUuid: legalEntityUUID,
+			Bic:             account.BIC,
+			Bank:            &account.BankName,
+			Address:         &account.BankAddress,
+			CorrAccount:     &account.CorrAccount,
+			CurrentAccount:  account.PaymentAccount,
+			Currency:        account.Currency,
+			Comment:         &account.Comment,
+			CreatedAt:       &account.CreatedAt,
+			UpdatedAt:       &account.UpdatedAt,
+		}
+	}
+	return oapi.GetBankAccounts200JSONResponse(accountsDTO), nil
+}
+
+func (a *Web) PostBankAccounts(ctx context.Context, request oapi.PostBankAccountsRequestObject) (oapi.PostBankAccountsResponseObject, error) {
+	// Проверка аутентификации
+	_, ok := ctx.Value(claimsKey).(jwt.Claims)
+	if !ok {
+		return nil, ErrInvalidAuthHeader
+	}
+
+	// Проверка обязательных полей
+	if request.Body.LegalEntityUuid == nil {
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "legal_entity_uuid is required")
+	}
+	if request.Body.Bic == "" {
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "bic is required")
+	}
+	if request.Body.CurrentAccount == "" {
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "current_account is required")
+	}
+	if request.Body.Currency == "" {
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "currency is required")
+	}
+
+	// Обработка опциональных полей
+	var bankName, address, corrAccount string
+	comment := "Нет Комментария"
+	if request.Body.Bank != nil {
+		bankName = *request.Body.Bank
+	}
+	if request.Body.Address != nil {
+		address = *request.Body.Address
+	}
+	if request.Body.CorrAccount != nil {
+		corrAccount = *request.Body.CorrAccount
+	}
+	if request.Body.Comment != nil {
+		comment = *request.Body.Comment
+	}
+
+	account := domain.BankAccount{
+		UUID:            uuid.New(),
+		LegalEntityUUID: *request.Body.LegalEntityUuid,
+		BIC:             request.Body.Bic,
+		BankName:        bankName,
+		BankAddress:     address,
+		CorrAccount:     corrAccount,
+		PaymentAccount:  request.Body.CurrentAccount,
+		Currency:        request.Body.Currency,
+		Comment:         comment, // Дефолтное значение
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+	}
+
+	if err := a.app.LegalEntitiesService.CreateBankAccount(account); err != nil {
+		return nil, err
+	}
+
+	// Подготовка ответа
+	response := oapi.PostBankAccounts201JSONResponse{
+		Uuid:            account.UUID,
+		LegalEntityUuid: &account.LegalEntityUUID,
+		Bic:             account.BIC,
+		CurrentAccount:  account.PaymentAccount,
+		Currency:        account.Currency,
+	}
+
+	// Добавление опциональных полей в ответ
+	if account.BankName != "" {
+		response.Bank = &account.BankName
+	}
+	if account.BankAddress != "" {
+		response.Address = &account.BankAddress
+	}
+	if account.CorrAccount != "" {
+		response.CorrAccount = &account.CorrAccount
+	}
+	if account.Comment != "" {
+		response.Comment = &account.Comment
+	}
+
+	createdAt := account.CreatedAt
+	updatedAt := account.UpdatedAt
+	response.CreatedAt = &createdAt
+	response.UpdatedAt = &updatedAt
+
+	return response, nil
+}
+
+func (a *Web) PatchBankAccountsUUID(ctx context.Context, request oapi.PatchBankAccountsUUIDRequestObject) (oapi.PatchBankAccountsUUIDResponseObject, error) {
+	// Проверка обязательных полей
+	if request.Body == nil {
+		return nil, echo.NewHTTPError(http.StatusBadRequest, "request body is required")
+	}
+
+	// Получаем текущий аккаунт
+	currentAccount, err := a.app.LegalEntitiesService.GetBankAccountByUUID(request.UUID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Подготавливаем обновления
+	updates := domain.BankAccount{
+		UUID:      request.UUID,
+		UpdatedAt: time.Now(),
+	}
+
+	// Применяем изменения только к переданным полям
+	if request.Body.Bank != nil {
+		updates.BankName = *request.Body.Bank
+	} else {
+		updates.BankName = currentAccount.BankName
+	}
+
+	if request.Body.Bic != "" {
+		updates.BIC = request.Body.Bic
+	} else {
+		updates.BIC = currentAccount.BIC
+	}
+
+	// Аналогично для остальных полей...
+	if request.Body.Address != nil {
+		updates.BankAddress = *request.Body.Address
+	}
+	if request.Body.CorrAccount != nil {
+		updates.CorrAccount = *request.Body.CorrAccount
+	}
+	if request.Body.CurrentAccount != "" {
+		updates.PaymentAccount = request.Body.CurrentAccount
+	}
+	if request.Body.Currency != "" {
+		updates.Currency = request.Body.Currency
+	}
+	if request.Body.Comment != nil {
+		updates.Comment = *request.Body.Comment
+	}
+
+	if err := a.app.LegalEntitiesService.UpdateBankAccount(updates); err != nil {
+		return nil, err
+	}
+
+	// Возвращаем обновлённый аккаунт
+	updatedAccount, err := a.app.LegalEntitiesService.GetBankAccountByUUID(request.UUID)
+	if err != nil {
+		return nil, err
+	}
+
+	return oapi.PatchBankAccountsUUID200JSONResponse{
+		Uuid:            updatedAccount.UUID,
+		LegalEntityUuid: &updatedAccount.LegalEntityUUID,
+		Bic:             updatedAccount.BIC,
+		Bank:            &updatedAccount.BankName,
+		Address:         &updatedAccount.BankAddress,
+		CorrAccount:     &updatedAccount.CorrAccount,
+		CurrentAccount:  updatedAccount.PaymentAccount,
+		Currency:        updatedAccount.Currency,
+		Comment:         &updatedAccount.Comment,
+		CreatedAt:       &updatedAccount.CreatedAt,
+		UpdatedAt:       &updatedAccount.UpdatedAt,
+	}, nil
+}
+
+func (a *Web) DeleteBankAccountsUUID(ctx context.Context, request oapi.DeleteBankAccountsUUIDRequestObject) (oapi.DeleteBankAccountsUUIDResponseObject, error) {
+	_, ok := ctx.Value(claimsKey).(jwt.Claims)
+	if !ok {
+		return nil, ErrInvalidAuthHeader
+	}
+
+	if err := a.app.LegalEntitiesService.DeleteBankAccount(request.UUID); err != nil {
+		return nil, err
+	}
+
+	return oapi.DeleteBankAccountsUUID204Response{}, nil
 }

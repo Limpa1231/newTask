@@ -49,6 +49,45 @@ type AgentPatchRequest struct {
 	Name string `json:"name" validate:"trim,name,min=3,max=100"`
 }
 
+// BankAccountDTO defines model for BankAccountDTO.
+type BankAccountDTO struct {
+	// Address Bank address
+	Address *string `json:"address,omitempty"`
+
+	// Bank Bank name
+	Bank *string `json:"bank,omitempty"`
+
+	// Bic Bank Identification Code (9 digits)
+	Bic string `json:"bic"`
+
+	// Comment Additional comments
+	Comment *string `json:"comment,omitempty"`
+
+	// CorrAccount Correspondent account
+	CorrAccount *string `json:"corr_account,omitempty"`
+
+	// CreatedAt Creation timestamp
+	CreatedAt *time.Time `json:"created_at,omitempty"`
+
+	// Currency Currency code (3 letters)
+	Currency string `json:"currency"`
+
+	// CurrentAccount Payment account number
+	CurrentAccount string `json:"current_account"`
+
+	// LegalEntityUuid Reference to legal entity
+	LegalEntityUuid *openapi_types.UUID `json:"legal_entity_uuid"`
+
+	// Name Bank account name/description
+	Name string `json:"name"`
+
+	// UpdatedAt Last update timestamp
+	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+
+	// Uuid Unique identifier of bank account
+	Uuid openapi_types.UUID `json:"uuid"`
+}
+
 // CompanyAddUserRequest defines model for CompanyAddUserRequest.
 type CompanyAddUserRequest struct {
 	UserUuid openapi_types.UUID `json:"user_uuid" validate:"uuid"`
@@ -348,6 +387,12 @@ type PatchTagUUIDJSONBody struct {
 	Name  string `json:"name" validate:"trim,min=1,max=100"`
 }
 
+// PostBankAccountsJSONRequestBody defines body for PostBankAccounts for application/json ContentType.
+type PostBankAccountsJSONRequestBody = BankAccountDTO
+
+// PatchBankAccountsUUIDJSONRequestBody defines body for PatchBankAccountsUUID for application/json ContentType.
+type PatchBankAccountsUUIDJSONRequestBody = BankAccountDTO
+
 // PostCompanyJSONRequestBody defines body for PostCompany for application/json ContentType.
 type PostCompanyJSONRequestBody = FederationCreateCompanyRequest
 
@@ -464,6 +509,18 @@ type GetUserJSONRequestBody = SearchUserRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Get all bank accounts
+	// (GET /bank-accounts)
+	GetBankAccounts(ctx echo.Context) error
+	// Create a new bank account
+	// (POST /bank-accounts)
+	PostBankAccounts(ctx echo.Context) error
+	// Delete bank account
+	// (DELETE /bank-accounts/{UUID})
+	DeleteBankAccountsUUID(ctx echo.Context, uUID Uuid) error
+	// Update bank account
+	// (PATCH /bank-accounts/{UUID})
+	PatchBankAccountsUUID(ctx echo.Context, uUID Uuid) error
 
 	// (POST /company)
 	PostCompany(ctx echo.Context) error
@@ -694,6 +751,64 @@ type ServerInterface interface {
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+}
+
+// GetBankAccounts converts echo context to params.
+func (w *ServerInterfaceWrapper) GetBankAccounts(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(BearerAuthScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetBankAccounts(ctx)
+	return err
+}
+
+// PostBankAccounts converts echo context to params.
+func (w *ServerInterfaceWrapper) PostBankAccounts(ctx echo.Context) error {
+	var err error
+
+	ctx.Set(BearerAuthScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PostBankAccounts(ctx)
+	return err
+}
+
+// DeleteBankAccountsUUID converts echo context to params.
+func (w *ServerInterfaceWrapper) DeleteBankAccountsUUID(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "UUID" -------------
+	var uUID Uuid
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "UUID", runtime.ParamLocationPath, ctx.Param("UUID"), &uUID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter UUID: %s", err))
+	}
+
+	ctx.Set(BearerAuthScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.DeleteBankAccountsUUID(ctx, uUID)
+	return err
+}
+
+// PatchBankAccountsUUID converts echo context to params.
+func (w *ServerInterfaceWrapper) PatchBankAccountsUUID(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "UUID" -------------
+	var uUID Uuid
+
+	err = runtime.BindStyledParameterWithLocation("simple", false, "UUID", runtime.ParamLocationPath, ctx.Param("UUID"), &uUID)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter UUID: %s", err))
+	}
+
+	ctx.Set(BearerAuthScopes, []string{})
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PatchBankAccountsUUID(ctx, uUID)
+	return err
 }
 
 // PostCompany converts echo context to params.
@@ -2247,6 +2362,10 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 		Handler: si,
 	}
 
+	router.GET(baseURL+"/bank-accounts", wrapper.GetBankAccounts)
+	router.POST(baseURL+"/bank-accounts", wrapper.PostBankAccounts)
+	router.DELETE(baseURL+"/bank-accounts/:UUID", wrapper.DeleteBankAccountsUUID)
+	router.PATCH(baseURL+"/bank-accounts/:UUID", wrapper.PatchBankAccountsUUID)
 	router.POST(baseURL+"/company", wrapper.PostCompany)
 	router.DELETE(baseURL+"/company/:UUID", wrapper.DeleteCompanyUUID)
 	router.GET(baseURL+"/company/:UUID", wrapper.GetCompanyUUID)
@@ -2323,6 +2442,145 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.PATCH(baseURL+"/tag/:UUID", wrapper.PatchTagUUID)
 	router.GET(baseURL+"/user", wrapper.GetUser)
 
+}
+
+type GetBankAccountsRequestObject struct {
+}
+
+type GetBankAccountsResponseObject interface {
+	VisitGetBankAccountsResponse(w http.ResponseWriter) error
+}
+
+type GetBankAccounts200JSONResponse []BankAccountDTO
+
+func (response GetBankAccounts200JSONResponse) VisitGetBankAccountsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetBankAccounts400Response struct {
+}
+
+func (response GetBankAccounts400Response) VisitGetBankAccountsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(400)
+	return nil
+}
+
+type GetBankAccounts500Response struct {
+}
+
+func (response GetBankAccounts500Response) VisitGetBankAccountsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(500)
+	return nil
+}
+
+type PostBankAccountsRequestObject struct {
+	Body *PostBankAccountsJSONRequestBody
+}
+
+type PostBankAccountsResponseObject interface {
+	VisitPostBankAccountsResponse(w http.ResponseWriter) error
+}
+
+type PostBankAccounts201JSONResponse BankAccountDTO
+
+func (response PostBankAccounts201JSONResponse) VisitPostBankAccountsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostBankAccounts400Response struct {
+}
+
+func (response PostBankAccounts400Response) VisitPostBankAccountsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(400)
+	return nil
+}
+
+type PostBankAccounts500Response struct {
+}
+
+func (response PostBankAccounts500Response) VisitPostBankAccountsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(500)
+	return nil
+}
+
+type DeleteBankAccountsUUIDRequestObject struct {
+	UUID Uuid `json:"UUID"`
+}
+
+type DeleteBankAccountsUUIDResponseObject interface {
+	VisitDeleteBankAccountsUUIDResponse(w http.ResponseWriter) error
+}
+
+type DeleteBankAccountsUUID204Response struct {
+}
+
+func (response DeleteBankAccountsUUID204Response) VisitDeleteBankAccountsUUIDResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteBankAccountsUUID404Response struct {
+}
+
+func (response DeleteBankAccountsUUID404Response) VisitDeleteBankAccountsUUIDResponse(w http.ResponseWriter) error {
+	w.WriteHeader(404)
+	return nil
+}
+
+type DeleteBankAccountsUUID500Response struct {
+}
+
+func (response DeleteBankAccountsUUID500Response) VisitDeleteBankAccountsUUIDResponse(w http.ResponseWriter) error {
+	w.WriteHeader(500)
+	return nil
+}
+
+type PatchBankAccountsUUIDRequestObject struct {
+	UUID Uuid `json:"UUID"`
+	Body *PatchBankAccountsUUIDJSONRequestBody
+}
+
+type PatchBankAccountsUUIDResponseObject interface {
+	VisitPatchBankAccountsUUIDResponse(w http.ResponseWriter) error
+}
+
+type PatchBankAccountsUUID200JSONResponse BankAccountDTO
+
+func (response PatchBankAccountsUUID200JSONResponse) VisitPatchBankAccountsUUIDResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchBankAccountsUUID400Response struct {
+}
+
+func (response PatchBankAccountsUUID400Response) VisitPatchBankAccountsUUIDResponse(w http.ResponseWriter) error {
+	w.WriteHeader(400)
+	return nil
+}
+
+type PatchBankAccountsUUID404Response struct {
+}
+
+func (response PatchBankAccountsUUID404Response) VisitPatchBankAccountsUUIDResponse(w http.ResponseWriter) error {
+	w.WriteHeader(404)
+	return nil
+}
+
+type PatchBankAccountsUUID500Response struct {
+}
+
+func (response PatchBankAccountsUUID500Response) VisitPatchBankAccountsUUIDResponse(w http.ResponseWriter) error {
+	w.WriteHeader(500)
+	return nil
 }
 
 type PostCompanyRequestObject struct {
@@ -3762,6 +4020,18 @@ func (response GetUser200JSONResponse) VisitGetUserResponse(w http.ResponseWrite
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// Get all bank accounts
+	// (GET /bank-accounts)
+	GetBankAccounts(ctx context.Context, request GetBankAccountsRequestObject) (GetBankAccountsResponseObject, error)
+	// Create a new bank account
+	// (POST /bank-accounts)
+	PostBankAccounts(ctx context.Context, request PostBankAccountsRequestObject) (PostBankAccountsResponseObject, error)
+	// Delete bank account
+	// (DELETE /bank-accounts/{UUID})
+	DeleteBankAccountsUUID(ctx context.Context, request DeleteBankAccountsUUIDRequestObject) (DeleteBankAccountsUUIDResponseObject, error)
+	// Update bank account
+	// (PATCH /bank-accounts/{UUID})
+	PatchBankAccountsUUID(ctx context.Context, request PatchBankAccountsUUIDRequestObject) (PatchBankAccountsUUIDResponseObject, error)
 
 	// (POST /company)
 	PostCompany(ctx context.Context, request PostCompanyRequestObject) (PostCompanyResponseObject, error)
@@ -3999,6 +4269,114 @@ func NewStrictHandler(ssi StrictServerInterface, middlewares []StrictMiddlewareF
 type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
+}
+
+// GetBankAccounts operation middleware
+func (sh *strictHandler) GetBankAccounts(ctx echo.Context) error {
+	var request GetBankAccountsRequestObject
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetBankAccounts(ctx.Request().Context(), request.(GetBankAccountsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetBankAccounts")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetBankAccountsResponseObject); ok {
+		return validResponse.VisitGetBankAccountsResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// PostBankAccounts operation middleware
+func (sh *strictHandler) PostBankAccounts(ctx echo.Context) error {
+	var request PostBankAccountsRequestObject
+
+	var body PostBankAccountsJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.PostBankAccounts(ctx.Request().Context(), request.(PostBankAccountsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostBankAccounts")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(PostBankAccountsResponseObject); ok {
+		return validResponse.VisitPostBankAccountsResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// DeleteBankAccountsUUID operation middleware
+func (sh *strictHandler) DeleteBankAccountsUUID(ctx echo.Context, uUID Uuid) error {
+	var request DeleteBankAccountsUUIDRequestObject
+
+	request.UUID = uUID
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteBankAccountsUUID(ctx.Request().Context(), request.(DeleteBankAccountsUUIDRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteBankAccountsUUID")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(DeleteBankAccountsUUIDResponseObject); ok {
+		return validResponse.VisitDeleteBankAccountsUUIDResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// PatchBankAccountsUUID operation middleware
+func (sh *strictHandler) PatchBankAccountsUUID(ctx echo.Context, uUID Uuid) error {
+	var request PatchBankAccountsUUIDRequestObject
+
+	request.UUID = uUID
+
+	var body PatchBankAccountsUUIDJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchBankAccountsUUID(ctx.Request().Context(), request.(PatchBankAccountsUUIDRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchBankAccountsUUID")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(PatchBankAccountsUUIDResponseObject); ok {
+		return validResponse.VisitPatchBankAccountsUUIDResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
 }
 
 // PostCompany operation middleware
