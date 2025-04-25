@@ -25,6 +25,7 @@ func (r *Repository) GetAllLegalEntities() ([]domain.LegalEntity, error) {
 		UpdatedAt time.Time
 	}
 
+	// 1. Загружаем юрлица
 	err := r.gorm.DB.Table("legal_entities").
 		Where("deleted_at IS NULL").
 		Find(&dbEntities).Error
@@ -32,14 +33,30 @@ func (r *Repository) GetAllLegalEntities() ([]domain.LegalEntity, error) {
 		return nil, err
 	}
 
-	// Конвертируем в доменные сущности
+	// 2. Загружаем все банковские счета для этих юрлиц
+	var accounts []domain.BankAccount
+	err = r.gorm.DB.
+		Where("legal_entity_uuid IN (SELECT uuid FROM legal_entities WHERE deleted_at IS NULL)").
+		Find(&accounts).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Группируем счета по legal_entity_uuid
+	accountsByLegalEntity := make(map[uuid.UUID][]domain.BankAccount)
+	for _, acc := range accounts {
+		accountsByLegalEntity[acc.LegalEntityUUID] = append(accountsByLegalEntity[acc.LegalEntityUUID], acc)
+	}
+
+	// 4. Собираем результат
 	entities := make([]domain.LegalEntity, len(dbEntities))
 	for i, e := range dbEntities {
 		entities[i] = domain.LegalEntity{
-			UUID:      e.UUID,
-			Name:      e.Name,
-			CreatedAt: e.CreatedAt,
-			UpdatedAt: e.UpdatedAt,
+			UUID:         e.UUID,
+			Name:         e.Name,
+			CreatedAt:    e.CreatedAt,
+			UpdatedAt:    e.UpdatedAt,
+			BankAccounts: accountsByLegalEntity[e.UUID], // Привязываем счета
 		}
 	}
 
