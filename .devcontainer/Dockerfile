@@ -1,6 +1,6 @@
 # See here for image contents: https://github.com/microsoft/vscode-dev-containers/tree/v0.245.2/containers/go/.devcontainer/base.Dockerfile
 
-ARG VARIANT="1.21"
+ARG VARIANT="1.24"
 ARG LINT="1.53.3"
 
 ARG USERNAME=vscode

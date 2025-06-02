@@ -8,7 +8,47 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+var (
+	legalEntitiesRequestsTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "legal_entities_requests_total",
+			Help: "Total number of requests to /legal-entities endpoint",
+		},
+	)
+
+	bankAccountsRequestsTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "bank_accounts_requests_total",
+			Help: "Total number of requests to /bank-accounts endpoint",
+		},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(legalEntitiesRequestsTotal)
+	prometheus.MustRegister(bankAccountsRequestsTotal)
+}
+
+func metricsMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		err := next(c)
+
+		switch c.Path() {
+		case "/legal-entities":
+			legalEntitiesRequestsTotal.Inc()
+
+		case "/bank-accounts":
+			bankAccountsRequestsTotal.Inc()
+
+		}
+
+		return err
+	}
+}
+
 func initMetricsRoutes(a *Web, e *echo.Echo) {
+	e.Use(metricsMiddleware)
+
 	e.Use(echoprometheus.NewMiddleware(a.Options.APP_NAME))
 
 	customCounter := prometheus.NewCounter(
@@ -28,5 +68,5 @@ func initMetricsRoutes(a *Web, e *echo.Echo) {
 		},
 	}))
 
-	e.GET("/metrics", echoprometheus.NewHandler()) // adds route to serve gathered metrics
+	e.GET("/metrics", echoprometheus.NewHandler())
 }
